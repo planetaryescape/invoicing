@@ -4,7 +4,7 @@ import { Database, DatabaseError } from "./Database.ts"
 import { bankAccounts } from "../db/drizzle-schema.ts"
 import type { BankAccount, CreateBankAccountInput } from "../types/index.ts"
 
-export class BankAccountService extends Context.Tag("BankAccountService")<
+export class BankAccountService extends Context.Service<
   BankAccountService,
   {
     readonly list: () => Effect.Effect<BankAccount[], DatabaseError>
@@ -15,7 +15,7 @@ export class BankAccountService extends Context.Tag("BankAccountService")<
     readonly delete: (id: number) => Effect.Effect<void, DatabaseError>
     readonly setDefault: (id: number) => Effect.Effect<BankAccount, DatabaseError>
   }
->() {}
+>()("BankAccountService") {}
 
 export const BankAccountServiceLive = Layer.effect(
   BankAccountService,
@@ -29,15 +29,15 @@ export const BankAccountServiceLive = Layer.effect(
             .update(bankAccounts)
             .set({ isDefault: false })
             .run(),
-        catch: (error) => new DatabaseError("Failed to clear default bank accounts", error),
+        catch: (error) => DatabaseError.new("Failed to clear default bank accounts", error),
       })
 
-    return {
+    return BankAccountService.of({
       list: () =>
         Effect.try({
           try: () =>
             database.db.select().from(bankAccounts).orderBy(asc(bankAccounts.label)).all() as BankAccount[],
-          catch: (error) => new DatabaseError("Failed to list bank accounts", error),
+          catch: (error) => DatabaseError.new("Failed to list bank accounts", error),
         }),
 
       get: (id: number) =>
@@ -46,7 +46,7 @@ export const BankAccountServiceLive = Layer.effect(
             const result = database.db.select().from(bankAccounts).where(eq(bankAccounts.id, id)).get()
             return result as BankAccount | undefined
           },
-          catch: (error) => new DatabaseError("Failed to get bank account", error),
+          catch: (error) => DatabaseError.new("Failed to get bank account", error),
         }),
 
       getDefault: () =>
@@ -59,7 +59,7 @@ export const BankAccountServiceLive = Layer.effect(
               .get()
             return result as BankAccount | undefined
           },
-          catch: (error) => new DatabaseError("Failed to get default bank account", error),
+          catch: (error) => DatabaseError.new("Failed to get default bank account", error),
         }),
 
       create: (input: CreateBankAccountInput) =>
@@ -71,7 +71,7 @@ export const BankAccountServiceLive = Layer.effect(
           // If this is the first bank account, make it default regardless
           const existing = yield* Effect.try({
             try: () => database.db.select().from(bankAccounts).all(),
-            catch: (error) => new DatabaseError("Failed to check existing bank accounts", error),
+            catch: (error) => DatabaseError.new("Failed to check existing bank accounts", error),
           })
           const shouldBeDefault = input.isDefault || existing.length === 0
 
@@ -92,21 +92,21 @@ export const BankAccountServiceLive = Layer.effect(
                   isDefault: shouldBeDefault,
                 })
                 .run(),
-            catch: (error) => new DatabaseError("Failed to create bank account", error),
+            catch: (error) => DatabaseError.new("Failed to create bank account", error),
           })
 
           const lastId = yield* Effect.try({
             try: () => database.sqlite.query("SELECT last_insert_rowid() as id").get() as { id: number },
-            catch: (error) => new DatabaseError("Failed to get last insert ID", error),
+            catch: (error) => DatabaseError.new("Failed to get last insert ID", error),
           })
 
           const account = yield* Effect.try({
             try: () => database.db.select().from(bankAccounts).where(eq(bankAccounts.id, lastId.id)).get(),
-            catch: (error) => new DatabaseError("Failed to retrieve created bank account", error),
+            catch: (error) => DatabaseError.new("Failed to retrieve created bank account", error),
           })
 
           if (!account) {
-            return yield* Effect.fail(new DatabaseError("Failed to retrieve created bank account"))
+            return yield* DatabaseError.new("Failed to retrieve created bank account")
           }
 
           return account as BankAccount
@@ -136,16 +136,16 @@ export const BankAccountServiceLive = Layer.effect(
                 })
                 .where(eq(bankAccounts.id, id))
                 .run(),
-            catch: (error) => new DatabaseError("Failed to update bank account", error),
+            catch: (error) => DatabaseError.new("Failed to update bank account", error),
           })
 
           const account = yield* Effect.try({
             try: () => database.db.select().from(bankAccounts).where(eq(bankAccounts.id, id)).get(),
-            catch: (error) => new DatabaseError("Failed to retrieve updated bank account", error),
+            catch: (error) => DatabaseError.new("Failed to retrieve updated bank account", error),
           })
 
           if (!account) {
-            return yield* Effect.fail(new DatabaseError("Bank account not found after update"))
+            return yield* DatabaseError.new("Bank account not found after update")
           }
 
           return account as BankAccount
@@ -155,23 +155,23 @@ export const BankAccountServiceLive = Layer.effect(
         Effect.gen(function* () {
           const account = yield* Effect.try({
             try: () => database.db.select().from(bankAccounts).where(eq(bankAccounts.id, id)).get(),
-            catch: (error) => new DatabaseError("Failed to get bank account", error),
+            catch: (error) => DatabaseError.new("Failed to get bank account", error),
           })
 
           if (!account) {
-            return yield* Effect.fail(new DatabaseError("Bank account not found"))
+            return yield* DatabaseError.new("Bank account not found")
           }
 
           const typed = account as BankAccount
           if (typed.isDefault) {
-            return yield* Effect.fail(new DatabaseError("Cannot delete the default bank account"))
+            return yield* DatabaseError.new("Cannot delete the default bank account")
           }
 
           yield* Effect.try({
             try: () => {
               database.db.delete(bankAccounts).where(eq(bankAccounts.id, id)).run()
             },
-            catch: (error) => new DatabaseError("Failed to delete bank account", error),
+            catch: (error) => DatabaseError.new("Failed to delete bank account", error),
           })
         }),
 
@@ -186,20 +186,20 @@ export const BankAccountServiceLive = Layer.effect(
                 .set({ isDefault: true })
                 .where(eq(bankAccounts.id, id))
                 .run(),
-            catch: (error) => new DatabaseError("Failed to set default bank account", error),
+            catch: (error) => DatabaseError.new("Failed to set default bank account", error),
           })
 
           const account = yield* Effect.try({
             try: () => database.db.select().from(bankAccounts).where(eq(bankAccounts.id, id)).get(),
-            catch: (error) => new DatabaseError("Failed to retrieve bank account", error),
+            catch: (error) => DatabaseError.new("Failed to retrieve bank account", error),
           })
 
           if (!account) {
-            return yield* Effect.fail(new DatabaseError("Bank account not found"))
+            return yield* DatabaseError.new("Bank account not found")
           }
 
           return account as BankAccount
         }),
-    }
+    })
   })
 )

@@ -4,14 +4,14 @@ import { Database, DatabaseError } from "./Database.ts"
 import { businessInfo } from "../db/drizzle-schema.ts"
 import type { BusinessInfo, CreateBusinessInfoInput } from "../types/index.ts"
 
-export class BusinessInfoService extends Context.Tag("BusinessInfoService")<
+export class BusinessInfoService extends Context.Service<
   BusinessInfoService,
   {
     readonly get: () => Effect.Effect<BusinessInfo | undefined, DatabaseError>
     readonly createOrUpdate: (input: CreateBusinessInfoInput) => Effect.Effect<BusinessInfo, DatabaseError>
     readonly update: (input: Partial<CreateBusinessInfoInput>) => Effect.Effect<BusinessInfo, DatabaseError>
   }
->() {}
+>()("BusinessInfoService") {}
 
 export const BusinessInfoServiceLive = Layer.effect(
   BusinessInfoService,
@@ -21,18 +21,18 @@ export const BusinessInfoServiceLive = Layer.effect(
     const get = () =>
       Effect.try({
         try: () => database.db.select().from(businessInfo).where(eq(businessInfo.id, 1)).get(),
-        catch: (error) => new DatabaseError("Failed to get business info", error),
+        catch: (error) => DatabaseError.new("Failed to get business info", error),
       }).pipe(Effect.map((result) => result as BusinessInfo | undefined))
 
     const update = (input: Partial<CreateBusinessInfoInput>) =>
       Effect.gen(function* () {
         const existing = yield* Effect.try({
           try: () => database.db.select().from(businessInfo).where(eq(businessInfo.id, 1)).get(),
-          catch: (error) => new DatabaseError("Failed to check existing business info", error),
+          catch: (error) => DatabaseError.new("Failed to check existing business info", error),
         })
 
         if (!existing) {
-          return yield* Effect.fail(new DatabaseError("Business info not found"))
+          return yield* DatabaseError.new("Business info not found")
         }
 
         yield* Effect.try({
@@ -57,16 +57,16 @@ export const BusinessInfoServiceLive = Layer.effect(
               })
               .where(eq(businessInfo.id, 1))
               .run(),
-          catch: (error) => new DatabaseError("Failed to update business info", error),
+          catch: (error) => DatabaseError.new("Failed to update business info", error),
         })
 
         const result = yield* Effect.try({
           try: () => database.db.select().from(businessInfo).where(eq(businessInfo.id, 1)).get(),
-          catch: (error) => new DatabaseError("Failed to retrieve business info", error),
+          catch: (error) => DatabaseError.new("Failed to retrieve business info", error),
         })
 
         if (!result) {
-          return yield* Effect.fail(new DatabaseError("Failed to retrieve business info"))
+          return yield* DatabaseError.new("Failed to retrieve business info")
         }
 
         return result as BusinessInfo
@@ -76,7 +76,7 @@ export const BusinessInfoServiceLive = Layer.effect(
       Effect.gen(function* () {
         const existing = yield* Effect.try({
           try: () => database.db.select().from(businessInfo).where(eq(businessInfo.id, 1)).get(),
-          catch: (error) => new DatabaseError("Failed to check existing business info", error),
+          catch: (error) => DatabaseError.new("Failed to check existing business info", error),
         })
 
         if (existing) {
@@ -105,25 +105,25 @@ export const BusinessInfoServiceLive = Layer.effect(
                 defaultVatRate: input.defaultVatRate ?? null,
               })
               .run(),
-          catch: (error) => new DatabaseError("Failed to create business info", error),
+          catch: (error) => DatabaseError.new("Failed to create business info", error),
         })
 
         const result = yield* Effect.try({
           try: () => database.db.select().from(businessInfo).where(eq(businessInfo.id, 1)).get(),
-          catch: (error) => new DatabaseError("Failed to retrieve business info", error),
+          catch: (error) => DatabaseError.new("Failed to retrieve business info", error),
         })
 
         if (!result) {
-          return yield* Effect.fail(new DatabaseError("Failed to retrieve business info"))
+          return yield* DatabaseError.new("Failed to retrieve business info")
         }
 
         return result as BusinessInfo
       })
 
-    return {
+    return BusinessInfoService.of({
       get,
       createOrUpdate,
       update,
-    }
+    })
   })
 )

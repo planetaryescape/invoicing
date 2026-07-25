@@ -21,9 +21,8 @@
     "gen:template-pdfs": "bun scripts/generate-test-pdfs.ts"
   },
   "dependencies": {
-    "@effect/platform": "^0.93.4",
     "drizzle-orm": "^0.44.7",
-    "effect": "^3.19.7",
+    "effect": "4.0.0-beta.101",
     "puppeteer": "^24.31.0"
   },
   "devDependencies": {

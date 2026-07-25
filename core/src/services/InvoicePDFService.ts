@@ -1,4 +1,4 @@
-import { Context, Effect, Layer } from "effect"
+import { Context, Effect, Layer, Schema } from "effect"
 import { InvoiceService } from "./InvoiceService.ts"
 import { CustomerService } from "./CustomerService.ts"
 import { BusinessInfoService } from "./BusinessInfoService.ts"
@@ -9,15 +9,16 @@ import { generateInvoiceHTML, generateReceiptHTML } from "../templates/invoice-t
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 
-export class InvoicePDFError {
-  readonly _tag = "InvoicePDFError"
-  constructor(
-    readonly message: string,
-    readonly cause?: unknown
-  ) {}
+export class InvoicePDFError extends Schema.TaggedErrorClass<InvoicePDFError>()("InvoicePDFError", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {
+  static new(message: string, cause?: unknown): InvoicePDFError {
+    return new InvoicePDFError({ message, ...(cause === undefined ? {} : { cause }) })
+  }
 }
 
-export class InvoicePDFService extends Context.Tag("InvoicePDFService")<
+export class InvoicePDFService extends Context.Service<
   InvoicePDFService,
   {
     readonly generatePDF: (
@@ -27,7 +28,7 @@ export class InvoicePDFService extends Context.Tag("InvoicePDFService")<
       invoiceId: number
     ) => Effect.Effect<Buffer, InvoicePDFError | DatabaseError | PDFError>
   }
->() {}
+>()("InvoicePDFService") {}
 
 export const InvoicePDFServiceLive = Layer.effect(
   InvoicePDFService,
@@ -42,21 +43,19 @@ export const InvoicePDFServiceLive = Layer.effect(
       Effect.gen(function* () {
         const invoiceWithLineItems = yield* invoiceService.get(invoiceId)
         if (!invoiceWithLineItems) {
-          return yield* Effect.fail(
-            new InvoicePDFError(`Invoice with id ${invoiceId} not found`)
-          )
+          return yield* InvoicePDFError.new(`Invoice with id ${invoiceId} not found`)
         }
 
         const customer = yield* customerService.get(invoiceWithLineItems.customerId)
         if (!customer) {
-          return yield* Effect.fail(
-            new InvoicePDFError(`Customer with id ${invoiceWithLineItems.customerId} not found`)
+          return yield* InvoicePDFError.new(
+            `Customer with id ${invoiceWithLineItems.customerId} not found`
           )
         }
 
         const businessInfo = yield* businessInfoService.get()
         if (!businessInfo) {
-          return yield* Effect.fail(new InvoicePDFError("Business info not configured"))
+          return yield* InvoicePDFError.new("Business info not configured")
         }
 
         const bankAccount = invoiceWithLineItems.bankAccountId
@@ -68,7 +67,7 @@ export const InvoicePDFServiceLive = Layer.effect(
           const logoPath = join(process.cwd(), businessInfo.logoPath)
           const logoBuffer = yield* Effect.tryPromise({
             try: () => readFile(logoPath),
-            catch: () => new InvoicePDFError(`Failed to read logo file: ${businessInfo.logoPath}`),
+            catch: () => InvoicePDFError.new(`Failed to read logo file: ${businessInfo.logoPath}`),
           }).pipe(Effect.orElseSucceed(() => undefined))
 
           if (logoBuffer) {
@@ -88,14 +87,12 @@ export const InvoicePDFServiceLive = Layer.effect(
         }
       })
 
-    return {
+    return InvoicePDFService.of({
       generateReceiptPDF: (invoiceId: number) =>
         Effect.gen(function* () {
           const templateData = yield* buildTemplateData(invoiceId)
           if (templateData.invoice.status !== "paid") {
-            return yield* Effect.fail(
-              new InvoicePDFError("Receipt can only be generated for paid invoices")
-            )
+            return yield* InvoicePDFError.new("Receipt can only be generated for paid invoices")
           }
           const html = generateReceiptHTML(templateData)
           return yield* pdfService.generatePDF({ html, format: "A4", printBackground: true })
@@ -107,6 +104,6 @@ export const InvoicePDFServiceLive = Layer.effect(
           const html = generateInvoiceHTML(templateData)
           return yield* pdfService.generatePDF({ html, format: "A4", printBackground: true })
         }),
-    }
+    })
   })
 )

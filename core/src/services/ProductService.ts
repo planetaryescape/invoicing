@@ -4,7 +4,7 @@ import { Database, DatabaseError } from "./Database.ts"
 import { products } from "../db/drizzle-schema.ts"
 import type { Product, CreateProductInput } from "../types/index.ts"
 
-export class ProductService extends Context.Tag("ProductService")<
+export class ProductService extends Context.Service<
   ProductService,
   {
     readonly list: () => Effect.Effect<Product[], DatabaseError>
@@ -13,18 +13,18 @@ export class ProductService extends Context.Tag("ProductService")<
     readonly update: (id: number, input: CreateProductInput) => Effect.Effect<Product, DatabaseError>
     readonly delete: (id: number) => Effect.Effect<void, DatabaseError>
   }
->() {}
+>()("ProductService") {}
 
 export const ProductServiceLive = Layer.effect(
   ProductService,
   Effect.gen(function* () {
     const database = yield* Database
 
-    return {
+    return ProductService.of({
       list: () =>
         Effect.try({
           try: () => database.db.select().from(products).orderBy(asc(products.name)).all() as Product[],
-          catch: (error) => new DatabaseError("Failed to list products", error),
+          catch: (error) => DatabaseError.new("Failed to list products", error),
         }),
 
       get: (id: number) =>
@@ -33,7 +33,7 @@ export const ProductServiceLive = Layer.effect(
             const result = database.db.select().from(products).where(eq(products.id, id)).get()
             return result as Product | undefined
           },
-          catch: (error) => new DatabaseError("Failed to get product", error),
+          catch: (error) => DatabaseError.new("Failed to get product", error),
         }),
 
       create: (input: CreateProductInput) =>
@@ -48,21 +48,21 @@ export const ProductServiceLive = Layer.effect(
                   defaultPrice: input.defaultPrice,
                 })
                 .run(),
-            catch: (error) => new DatabaseError("Failed to create product", error),
+            catch: (error) => DatabaseError.new("Failed to create product", error),
           })
 
           const lastId = yield* Effect.try({
             try: () => database.sqlite.query("SELECT last_insert_rowid() as id").get() as { id: number },
-            catch: (error) => new DatabaseError("Failed to get last insert ID", error),
+            catch: (error) => DatabaseError.new("Failed to get last insert ID", error),
           })
 
           const product = yield* Effect.try({
             try: () => database.db.select().from(products).where(eq(products.id, lastId.id)).get(),
-            catch: (error) => new DatabaseError("Failed to retrieve created product", error),
+            catch: (error) => DatabaseError.new("Failed to retrieve created product", error),
           })
 
           if (!product) {
-            return yield* Effect.fail(new DatabaseError("Failed to retrieve created product"))
+            return yield* DatabaseError.new("Failed to retrieve created product")
           }
 
           return product as Product
@@ -81,16 +81,16 @@ export const ProductServiceLive = Layer.effect(
                 })
                 .where(eq(products.id, id))
                 .run(),
-            catch: (error) => new DatabaseError("Failed to update product", error),
+            catch: (error) => DatabaseError.new("Failed to update product", error),
           })
 
           const product = yield* Effect.try({
             try: () => database.db.select().from(products).where(eq(products.id, id)).get(),
-            catch: (error) => new DatabaseError("Failed to retrieve updated product", error),
+            catch: (error) => DatabaseError.new("Failed to retrieve updated product", error),
           })
 
           if (!product) {
-            return yield* Effect.fail(new DatabaseError("Product not found after update"))
+            return yield* DatabaseError.new("Product not found after update")
           }
 
           return product as Product
@@ -101,8 +101,8 @@ export const ProductServiceLive = Layer.effect(
           try: () => {
             database.db.delete(products).where(eq(products.id, id)).run()
           },
-          catch: (error) => new DatabaseError("Failed to delete product", error),
+          catch: (error) => DatabaseError.new("Failed to delete product", error),
         }),
-    }
+    })
   })
 )
