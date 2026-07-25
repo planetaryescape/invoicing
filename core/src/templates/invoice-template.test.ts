@@ -93,6 +93,23 @@ const ibanBankAccount: BankAccount = {
   createdAt: "2024-01-01T00:00:00.000Z",
 }
 
+// Wise-style GBP account: has BOTH domestic details (account number + sort code)
+// and international details (IBAN + SWIFT/BIC)
+const gbpBankAccount: BankAccount = {
+  id: 3,
+  label: "Wise (GBP)",
+  currency: "GBP",
+  accountHolderName: "Test Biz Ltd",
+  bankName: "Wise Payments Limited",
+  accountNumber: "36945893",
+  branchCode: "23-14-70",
+  iban: "GB57TRWI23147036945893",
+  swiftBic: "TRWIGB2LXXX",
+  bankAddress: "1st Floor, Worship Square, 65 Clifton Street, London, EC2A 4JE, United Kingdom",
+  isDefault: false,
+  createdAt: "2024-01-01T00:00:00.000Z",
+}
+
 const baseData = (bankAccount?: BankAccount): InvoiceTemplateData => ({
   invoice: baseInvoice,
   lineItems: [baseLineItem],
@@ -158,6 +175,34 @@ describe("generateInvoiceHTML - bank details rendering", () => {
     expect(html).toContain("FNB")
     expect(html).toContain("111111111")
     expect(html).toContain("250655")
+  })
+
+  test("renders both domestic and international details for GBP account with both", () => {
+    const html = generateInvoiceHTML(baseData(gbpBankAccount))
+
+    // Domestic (UK) details
+    expect(html).toContain(">Account:<")
+    expect(html).toContain("36945893")
+    expect(html).toContain("Sort Code")
+    expect(html).toContain("23-14-70")
+
+    // International details
+    expect(html).toContain("GB57TRWI23147036945893")
+    expect(html).toContain("TRWIGB2LXXX")
+    expect(html).toContain("SWIFT/BIC")
+    expect(html).toContain("Bank Address")
+    expect(html).toContain("Account Holder")
+
+    // GBP accounts never say "Branch Code"
+    expect(html).not.toContain(">Branch Code:<")
+  })
+
+  test("labels branch code as Sort Code only for GBP, Branch Code for ZAR", () => {
+    const gbpHtml = generateInvoiceHTML(baseData(gbpBankAccount))
+    const zarHtml = generateInvoiceHTML(baseData(localBankAccount))
+
+    expect(gbpHtml).toContain(">Sort Code:<")
+    expect(zarHtml).toContain(">Branch Code:<")
   })
 
   test("renders product name and description for product-backed items", () => {

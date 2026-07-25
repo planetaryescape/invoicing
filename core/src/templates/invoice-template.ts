@@ -1,4 +1,5 @@
 import type { Invoice, InvoiceLineItem, Customer, BusinessInfo, BankAccount } from "../types/index.ts"
+import { routingCodeLabel } from "../types/index.ts"
 
 export interface InvoiceTemplateData {
   invoice: Invoice
@@ -41,6 +42,7 @@ export const generateReceiptHTML = (data: InvoiceTemplateData): string => {
   const itemLabel = (item: InvoiceLineItem) => item.productName || item.description
   const itemSubLabel = (item: InvoiceLineItem) =>
     item.productName && item.description !== item.productName ? item.description : null
+  const customerLocation = [customer.postalCode, customer.country].filter(Boolean).join(", ")
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -70,10 +72,14 @@ export const generateReceiptHTML = (data: InvoiceTemplateData): string => {
     .detail-line { margin-bottom: 2px; font-size: 14px; color: #333; }
     .detail-label { display: inline-block; width: 140px; font-weight: 600; }
 
-    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-    thead th { text-align: left; padding: 12px 0; border-bottom: 1px solid #ddd; font-size: 12px; font-weight: 600; color: #666; letter-spacing: 0.5px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; table-layout: fixed; }
+    thead th { text-align: left; padding: 12px 8px; border-bottom: 1px solid #ddd; font-size: 12px; font-weight: 600; color: #666; letter-spacing: 0.5px; }
+    thead th:first-child { padding-left: 0; }
+    thead th:last-child { padding-right: 0; }
     thead th.right { text-align: right; }
-    tbody td { padding: 16px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+    tbody td { padding: 16px 8px; border-bottom: 1px solid #f0f0f0; font-size: 14px; vertical-align: top; }
+    tbody td:first-child { padding-left: 0; }
+    tbody td:last-child { padding-right: 0; }
     tbody td.right { text-align: right; }
     .item-description { font-weight: 500; }
     .item-notes { font-size: 12px; color: #666; margin-top: 4px; }
@@ -116,9 +122,9 @@ export const generateReceiptHTML = (data: InvoiceTemplateData): string => {
           <div class="section-label">RECEIVED FROM</div>
           <div class="bill-to-name">${customer.name}</div>
           ${customer.vatNumber ? `<div class="detail-line" style="font-weight: 600;">VAT: ${customer.vatNumber}</div>` : ""}
-          <div class="detail-line">${customer.streetAddress}</div>
-          <div class="detail-line">${customer.city}</div>
-          <div class="detail-line">${customer.postalCode}, ${customer.country}</div>
+          ${customer.streetAddress ? `<div class="detail-line">${customer.streetAddress}</div>` : ""}
+          ${customer.city ? `<div class="detail-line">${customer.city}</div>` : ""}
+          ${customerLocation ? `<div class="detail-line">${customerLocation}</div>` : ""}
           <div class="detail-line" style="margin-top: 12px;">${customer.phone}</div>
           <div class="detail-line">${customer.email}</div>
         </div>
@@ -133,6 +139,12 @@ export const generateReceiptHTML = (data: InvoiceTemplateData): string => {
 
       <!-- Line Items Table -->
       <table>
+        <colgroup>
+          <col style="width: 56%" />
+          <col style="width: 12%" />
+          <col style="width: 16%" />
+          <col style="width: 16%" />
+        </colgroup>
         <thead>
           <tr>
             <th>ITEMS</th>
@@ -215,6 +227,7 @@ export const generateInvoiceHTML = (data: InvoiceTemplateData): string => {
   const itemLabel = (item: InvoiceLineItem) => item.productName || item.description
   const itemSubLabel = (item: InvoiceLineItem) =>
     item.productName && item.description !== item.productName ? item.description : null
+  const customerLocation = [customer.postalCode, customer.country].filter(Boolean).join(", ")
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -243,10 +256,14 @@ export const generateInvoiceHTML = (data: InvoiceTemplateData): string => {
     .detail-line { margin-bottom: 2px; font-size: 14px; color: #333; }
     .detail-label { display: inline-block; width: 140px; font-weight: 600; }
 
-    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-    thead th { text-align: left; padding: 12px 0; border-bottom: 1px solid #ddd; font-size: 12px; font-weight: 600; color: #666; letter-spacing: 0.5px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; table-layout: fixed; }
+    thead th { text-align: left; padding: 12px 8px; border-bottom: 1px solid #ddd; font-size: 12px; font-weight: 600; color: #666; letter-spacing: 0.5px; }
+    thead th:first-child { padding-left: 0; }
+    thead th:last-child { padding-right: 0; }
     thead th.right { text-align: right; }
-    tbody td { padding: 16px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+    tbody td { padding: 16px 8px; border-bottom: 1px solid #f0f0f0; font-size: 14px; vertical-align: top; }
+    tbody td:first-child { padding-left: 0; }
+    tbody td:last-child { padding-right: 0; }
     tbody td.right { text-align: right; }
     .item-description { font-weight: 500; }
     .item-notes { font-size: 12px; color: #666; margin-top: 4px; }
@@ -265,9 +282,8 @@ export const generateInvoiceHTML = (data: InvoiceTemplateData): string => {
     .footer-left .name { font-weight: 600; margin-bottom: 4px; }
     .footer-right { text-align: right; }
     .footer-right .label { font-weight: 600; margin-bottom: 4px; }
-    .footer-bank { margin-top: 20px; font-size: 11px; color: #666; }
-    .bank-details { display: inline-block; margin-right: 30px; }
-    .bank-details .label { font-weight: 600; display: block; }
+    .footer-bank { margin-top: 20px; font-size: 11px; color: #666; display: flex; flex-wrap: wrap; gap: 14px 32px; }
+    .bank-details .label { font-weight: 600; display: block; margin-bottom: 2px; }
   </style>
 </head>
 <body>
@@ -290,9 +306,9 @@ export const generateInvoiceHTML = (data: InvoiceTemplateData): string => {
           <div class="section-label">BILL TO</div>
           <div class="bill-to-name">${customer.name}</div>
           ${customer.vatNumber ? `<div class="detail-line" style="font-weight: 600;">VAT: ${customer.vatNumber}</div>` : ""}
-          <div class="detail-line">${customer.streetAddress}</div>
-          <div class="detail-line">${customer.city}</div>
-          <div class="detail-line">${customer.postalCode}, ${customer.country}</div>
+          ${customer.streetAddress ? `<div class="detail-line">${customer.streetAddress}</div>` : ""}
+          ${customer.city ? `<div class="detail-line">${customer.city}</div>` : ""}
+          ${customerLocation ? `<div class="detail-line">${customerLocation}</div>` : ""}
           <div class="detail-line" style="margin-top: 12px;">${customer.phone}</div>
           <div class="detail-line">${customer.email}</div>
         </div>
@@ -306,6 +322,12 @@ export const generateInvoiceHTML = (data: InvoiceTemplateData): string => {
 
       <!-- Line Items Table -->
       <table>
+        <colgroup>
+          <col style="width: 56%" />
+          <col style="width: 12%" />
+          <col style="width: 16%" />
+          <col style="width: 16%" />
+        </colgroup>
         <thead>
           <tr>
             <th>ITEMS</th>
@@ -374,15 +396,22 @@ export const generateInvoiceHTML = (data: InvoiceTemplateData): string => {
         </div>
       </div>
       <div class="footer-bank">
-        ${bankAccount ? (
-          bankAccount.iban
-            ? `
+        ${bankAccount ? `
         <span class="bank-details">
           <span class="label">Bank:</span> ${bankAccount.bankName}
         </span>
+        ${bankAccount.accountNumber ? `
+        <span class="bank-details">
+          <span class="label">Account:</span> ${bankAccount.accountNumber}
+        </span>` : ""}
+        ${bankAccount.branchCode ? `
+        <span class="bank-details">
+          <span class="label">${routingCodeLabel(bankAccount.currency)}:</span> ${bankAccount.branchCode}
+        </span>` : ""}
+        ${bankAccount.iban ? `
         <span class="bank-details">
           <span class="label">IBAN:</span> ${bankAccount.iban}
-        </span>
+        </span>` : ""}
         ${bankAccount.swiftBic ? `
         <span class="bank-details">
           <span class="label">SWIFT/BIC:</span> ${bankAccount.swiftBic}
@@ -394,22 +423,7 @@ export const generateInvoiceHTML = (data: InvoiceTemplateData): string => {
         <span class="bank-details">
           <span class="label">Bank Address:</span> ${bankAccount.bankAddress}
         </span>` : ""}
-        `
-            : `
-        <span class="bank-details">
-          <span class="label">Bank:</span> ${bankAccount.bankName}
-        </span>
-        <span class="bank-details">
-          <span class="label">Account:</span> ${bankAccount.accountNumber}
-        </span>
-        <span class="bank-details">
-          <span class="label">Branch Code:</span> ${bankAccount.branchCode}
-        </span>
-        <span class="bank-details">
-          <span class="label">Account Holder:</span> ${bankAccount.accountHolderName}
-        </span>
-        `
-        ) : `
+        ` : `
         <span class="bank-details">
           <span class="label">Bank:</span> ${businessInfo.bankName}
         </span>
