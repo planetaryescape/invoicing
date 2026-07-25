@@ -1,0 +1,20 @@
+{
+  "name": "@invoicing/server",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --hot src/index.ts",
+    "start": "bun dist/index.js",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "clean": "rm -rf dist node_modules"
+  },
+  "dependencies": {
+    "@effect/platform-bun": "4.0.0-beta.101",
+    "@invoicing/core": "workspace:*",
+    "@invoicing/shared": "workspace:*",
+    "effect": "4.0.0-beta.101"
+  }
+}

@@ -1,4 +1,4 @@
-import { Layer } from "effect"
+import { Effect, Layer } from "effect"
 import { Database as SQLiteDatabase } from "bun:sqlite"
 import { drizzle } from "drizzle-orm/bun-sqlite"
 import { Database } from "../services/Database.ts"
@@ -118,12 +118,15 @@ const createTestDatabase = (): SQLiteDatabase => {
   return sqlite
 }
 
-export const TestDatabaseLive = Layer.sync(Database, () => {
-  const sqlite = createTestDatabase()
-  const db = drizzle(sqlite, { schema })
+export const TestDatabaseLive = Layer.effect(
+  Database,
+  Effect.acquireRelease(
+    Effect.sync(() => {
+      const sqlite = createTestDatabase()
+      const db = drizzle(sqlite, { schema })
 
-  return {
-    db,
-    sqlite,
-  }
-})
+      return Database.of({ db, sqlite })
+    }),
+    (database) => Effect.sync(() => database.sqlite.close()),
+  ),
+)
