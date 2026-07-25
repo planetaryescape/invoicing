@@ -1,4 +1,5 @@
 import { Effect, Layer } from "effect"
+import { BunFileSystem, BunPath } from "@effect/platform-bun"
 import { HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http"
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc"
 import {
@@ -18,8 +19,8 @@ const assetFileNamePattern = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/
 
 const parseInvoiceId = Effect.fn("PdfRoute.parseInvoiceId")(function* () {
   const { id } = yield* HttpRouter.params
-  const invoiceId = Number.parseInt(id ?? "")
-  if (Number.isNaN(invoiceId)) {
+  const invoiceId = Number(id)
+  if (!/^[1-9]\d*$/.test(id ?? "") || !Number.isSafeInteger(invoiceId)) {
     return yield* Effect.fail(errorResponse("Invalid ID parameter", 400))
   }
   return invoiceId
@@ -91,6 +92,7 @@ const makeApiRoutes = <E>(databaseLayer: Layer.Layer<Database, E>) => {
   const pdfService = InvoicePDFServiceLive.pipe(
     Layer.provide(PDFServiceLive),
     Layer.provide(coreServices),
+    Layer.provide(Layer.mergeAll(BunFileSystem.layer, BunPath.layer)),
   )
   return Layer.mergeAll(
     makeRpcRoutes(databaseLayer),

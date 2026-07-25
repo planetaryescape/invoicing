@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Schema } from "effect"
+import { Context, Effect, Encoding, FileSystem, Layer, Path, Schema } from "effect"
 import { InvoiceService } from "./InvoiceService.ts"
 import { CustomerService } from "./CustomerService.ts"
 import { BusinessInfoService } from "./BusinessInfoService.ts"
@@ -6,8 +6,6 @@ import { BankAccountService } from "./BankAccountService.ts"
 import { PDFService, PDFError } from "./PDFService.ts"
 import { DatabaseError } from "./Database.ts"
 import { generateInvoiceHTML, generateReceiptHTML } from "../templates/invoice-template.ts"
-import { readFile } from "node:fs/promises"
-import { join } from "node:path"
 
 export class InvoicePDFError extends Schema.TaggedErrorClass<InvoicePDFError>()("InvoicePDFError", {
   message: Schema.String,
@@ -38,6 +36,17 @@ export const InvoicePDFServiceLive = Layer.effect(
     const businessInfoService = yield* BusinessInfoService
     const bankAccountService = yield* BankAccountService
     const pdfService = yield* PDFService
+    const fileSystem = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
+    const logoRoot = path.resolve("uploads")
+
+    const resolveLogoPath = (fileName: string): string | undefined => {
+      const filePath = path.resolve(logoRoot, fileName)
+      const relativePath = path.relative(logoRoot, filePath)
+      return relativePath !== "" && relativePath === path.basename(filePath)
+        ? filePath
+        : undefined
+    }
 
     const buildTemplateData = (invoiceId: number) =>
       Effect.gen(function* () {
@@ -64,16 +73,18 @@ export const InvoicePDFServiceLive = Layer.effect(
 
         let logoDataUrl: string | undefined
         if (businessInfo.logoPath) {
-          const logoPath = join(process.cwd(), businessInfo.logoPath)
-          const logoBuffer = yield* Effect.tryPromise({
-            try: () => readFile(logoPath),
-            catch: () => InvoicePDFError.new(`Failed to read logo file: ${businessInfo.logoPath}`),
-          }).pipe(Effect.orElseSucceed(() => undefined))
+          const logoPath = resolveLogoPath(businessInfo.logoPath)
+          const logoBuffer = logoPath === undefined
+            ? undefined
+            : yield* fileSystem.readFile(logoPath).pipe(
+              Effect.mapError(() => InvoicePDFError.new(`Failed to read logo file: ${businessInfo.logoPath}`)),
+              Effect.orElseSucceed(() => undefined),
+            )
 
           if (logoBuffer) {
             const ext = businessInfo.logoPath.split(".").pop()?.toLowerCase()
             const mimeType = ext === "svg" ? "image/svg+xml" : ext === "png" ? "image/png" : "image/jpeg"
-            logoDataUrl = `data:${mimeType};base64,${logoBuffer.toString("base64")}`
+            logoDataUrl = `data:${mimeType};base64,${Encoding.encodeBase64(logoBuffer)}`
           }
         }
 

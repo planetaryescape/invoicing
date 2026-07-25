@@ -20,6 +20,10 @@ export const BusinessInfo = Schema.Struct({
 })
 export type BusinessInfo = typeof BusinessInfo.Type
 
+const LogoFileName = Schema.String.check(
+  Schema.isPattern(/^[a-zA-Z0-9][a-zA-Z0-9._-]*\.(?:jpe?g|png|svg)$/i),
+)
+
 export const BusinessInfoInput = Schema.Struct({
   companyName: Schema.String,
   streetAddress: Schema.String,
@@ -29,7 +33,7 @@ export const BusinessInfoInput = Schema.Struct({
   vatNumber: Schema.String,
   email: Schema.String,
   phone: Schema.String,
-  logoPath: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  logoPath: Schema.optionalKey(Schema.NullOr(LogoFileName)),
   accountHolderName: Schema.String,
   bankName: Schema.String,
   accountNumber: Schema.String,
@@ -152,7 +156,7 @@ export type InvoiceWithLineItems = typeof InvoiceWithLineItems.Type
 export const LineItemInput = Schema.Struct({
   productId: Schema.NullOr(Schema.Number),
   description: Schema.optionalKey(Schema.String),
-  quantity: Schema.Number,
+  quantity: Schema.Number.check(Schema.isGreaterThan(0)),
   unitPrice: Schema.optionalKey(Schema.Number),
   additionalNotes: Schema.optionalKey(Schema.NullOr(Schema.String)),
 })

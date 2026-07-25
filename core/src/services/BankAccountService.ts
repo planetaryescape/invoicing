@@ -132,7 +132,7 @@ export const BankAccountServiceLive = Layer.effect(
                   iban: input.iban ?? null,
                   swiftBic: input.swiftBic ?? null,
                   bankAddress: input.bankAddress ?? null,
-                  isDefault: input.isDefault ?? false,
+                  ...(input.isDefault === undefined ? {} : { isDefault: input.isDefault }),
                 })
                 .where(eq(bankAccounts.id, id))
                 .run(),

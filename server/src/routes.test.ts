@@ -36,8 +36,11 @@ test("serves both PDF route shapes with download headers", async () => {
 
 test("returns 400 for invalid PDF IDs and 500 for generation failures", async () => {
   const invalid = await handler.handler(new Request("http://localhost/api/invoices/not-a-number/pdf"))
+  const numericPrefix = await handler.handler(new Request("http://localhost/api/invoices/42junk/pdf"))
   expect(invalid.status).toBe(400)
   expect(await invalid.json()).toEqual({ error: "Invalid ID parameter" })
+  expect(numericPrefix.status).toBe(400)
+  expect(await numericPrefix.json()).toEqual({ error: "Invalid ID parameter" })
 
   const failingService = Layer.succeed(
     InvoicePDFService,
