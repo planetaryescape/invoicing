@@ -1,12 +1,13 @@
-import { Context, Effect, Layer } from "effect"
+import { Context, Effect, Layer, Schema } from "effect"
 import puppeteer from "puppeteer"
 
-export class PDFError {
-  readonly _tag = "PDFError"
-  constructor(
-    readonly message: string,
-    readonly cause?: unknown
-  ) {}
+export class PDFError extends Schema.TaggedErrorClass<PDFError>()("PDFError", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {
+  static new(message: string, cause?: unknown): PDFError {
+    return new PDFError({ message, ...(cause === undefined ? {} : { cause }) })
+  }
 }
 
 export interface GeneratePDFOptions {
@@ -15,34 +16,32 @@ export interface GeneratePDFOptions {
   printBackground?: boolean
 }
 
-export class PDFService extends Context.Tag("PDFService")<
+export class PDFService extends Context.Service<
   PDFService,
   {
     readonly generatePDF: (options: GeneratePDFOptions) => Effect.Effect<Buffer, PDFError>
   }
->() {}
+>()("PDFService") {}
 
 export const PDFServiceLive = Layer.succeed(
   PDFService,
   PDFService.of({
     generatePDF: (options: GeneratePDFOptions) =>
-      Effect.gen(function* () {
-        let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null
-
-        try {
-          browser = yield* Effect.tryPromise({
-            try: () => puppeteer.launch({ headless: true }),
-            catch: (error) => new PDFError("Failed to launch browser", error),
-          })
-
+      Effect.acquireUseRelease(
+        Effect.tryPromise({
+          try: () => puppeteer.launch({ headless: true }),
+          catch: (error) => PDFError.new("Failed to launch browser", error),
+        }),
+        (browser) =>
+          Effect.gen(function* () {
           const page = yield* Effect.tryPromise({
-            try: () => browser!.newPage(),
-            catch: (error) => new PDFError("Failed to create new page", error),
+            try: () => browser.newPage(),
+            catch: (error) => PDFError.new("Failed to create new page", error),
           })
 
           yield* Effect.tryPromise({
             try: () => page.setContent(options.html, { waitUntil: "networkidle0" }),
-            catch: (error) => new PDFError("Failed to set page content", error),
+            catch: (error) => PDFError.new("Failed to set page content", error),
           })
 
           const pdfBuffer = yield* Effect.tryPromise({
@@ -57,18 +56,16 @@ export const PDFServiceLive = Layer.succeed(
                   left: "15mm",
                 },
               }),
-            catch: (error) => new PDFError("Failed to generate PDF", error),
+            catch: (error) => PDFError.new("Failed to generate PDF", error),
           })
 
           return Buffer.from(pdfBuffer)
-        } finally {
-          if (browser) {
-            yield* Effect.tryPromise({
-              try: () => browser!.close(),
-              catch: () => new PDFError("Failed to close browser"),
-            }).pipe(Effect.ignore)
-          }
-        }
-      }),
+          }),
+        (browser) =>
+          Effect.tryPromise({
+            try: () => browser.close(),
+            catch: () => PDFError.new("Failed to close browser"),
+          }).pipe(Effect.ignore)
+      ),
   })
 )

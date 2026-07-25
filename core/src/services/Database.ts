@@ -1,11 +1,15 @@
-import { Context, Layer } from "effect"
+import { Context, Layer, Schema } from "effect"
 import { Database as SQLiteDatabase } from "bun:sqlite"
 import { drizzle, type BunSQLiteDatabase } from "drizzle-orm/bun-sqlite"
 import * as schema from "../db/drizzle-schema.ts"
 
-export class DatabaseError {
-  readonly _tag = "DatabaseError"
-  constructor(readonly message: string, readonly cause?: unknown) {}
+export class DatabaseError extends Schema.TaggedErrorClass<DatabaseError>()("DatabaseError", {
+  message: Schema.String,
+  cause: Schema.optionalKey(Schema.Defect()),
+}) {
+  static new(message: string, cause?: unknown): DatabaseError {
+    return new DatabaseError({ message, ...(cause === undefined ? {} : { cause }) })
+  }
 }
 
 
@@ -14,7 +18,7 @@ export interface DatabaseService {
   readonly sqlite: SQLiteDatabase
 }
 
-export class Database extends Context.Tag("Database")<Database, DatabaseService>() {}
+export class Database extends Context.Service<Database, DatabaseService>()("Database") {}
 
 const initializeDatabase = (dbPath: string): SQLiteDatabase => {
   const sqlite = new SQLiteDatabase(dbPath)
