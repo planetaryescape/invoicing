@@ -38,25 +38,44 @@ export const InvoicePDFServiceLive = Layer.effect(
     const pdfService = yield* PDFService
     const fileSystem = yield* FileSystem.FileSystem
     const path = yield* Path.Path
+    const projectRoot = path.resolve(".")
     const logoRoot = path.resolve("uploads")
 
-    const resolveLogoCandidate = (fileName: string): string => {
-      if (path.isAbsolute(fileName)) {
-        return path.resolve(fileName)
-      }
-      if (path.basename(fileName) === fileName) {
-        return path.resolve(logoRoot, fileName)
-      }
-      return path.resolve(fileName)
+    const isWithin = (root: string, filePath: string): boolean => {
+      const relativePath = path.relative(root, filePath)
+      return relativePath !== ""
+        && !path.isAbsolute(relativePath)
+        && relativePath !== ".."
+        && !relativePath.startsWith(`..${path.sep}`)
     }
 
-    const resolveLogoPath = (fileName: string): string | undefined => {
-      const filePath = resolveLogoCandidate(fileName)
-      const relativePath = path.relative(logoRoot, filePath)
-      return relativePath !== "" && relativePath === path.basename(filePath)
-        ? filePath
-        : undefined
+    const legacyFileName = (fileName: string): string => {
+      if (!path.isAbsolute(fileName)) {
+        return fileName
+      }
+      return path.relative(path.parse(fileName).root, fileName)
     }
+
+    const resolveLogoPath = Effect.fn("InvoicePDFService.resolveLogoPath")(function* (fileName: string) {
+      if (![".jpeg", ".jpg", ".png", ".svg"].includes(path.extname(fileName).toLowerCase())) {
+        return undefined
+      }
+
+      if (path.isAbsolute(fileName) && isWithin(logoRoot, fileName)) {
+        return path.resolve(fileName)
+      }
+
+      if (path.basename(fileName) === fileName) {
+        const uploadPath = path.resolve(logoRoot, fileName)
+        const uploadExists = yield* fileSystem.exists(uploadPath).pipe(Effect.orElseSucceed(() => false))
+        if (uploadExists) {
+          return uploadPath
+        }
+      }
+
+      const legacyPath = path.resolve(projectRoot, legacyFileName(fileName))
+      return isWithin(projectRoot, legacyPath) ? legacyPath : undefined
+    })
 
     const buildTemplateData = (invoiceId: number) =>
       Effect.gen(function* () {
@@ -83,7 +102,7 @@ export const InvoicePDFServiceLive = Layer.effect(
 
         let logoDataUrl: string | undefined
         if (businessInfo.logoPath) {
-          const logoPath = resolveLogoPath(businessInfo.logoPath)
+          const logoPath = yield* resolveLogoPath(businessInfo.logoPath)
           const logoBuffer = logoPath === undefined
             ? undefined
             : yield* fileSystem.readFile(logoPath).pipe(
