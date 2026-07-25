@@ -1,0 +1,29 @@
+{
+  "name": "@invoicing/web",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist node_modules"
+  },
+  "dependencies": {
+    "@effect/platform-browser": "4.0.0-beta.101",
+    "@foldkit/ui": "0.132.0",
+    "@invoicing/shared": "workspace:*",
+    "effect": "4.0.0-beta.101",
+    "foldkit": "0.132.0"
+  },
+  "devDependencies": {
+    "@foldkit/vite-plugin": "0.11.1",
+    "@tailwindcss/vite": "^4.3.1",
+    "happy-dom": "^20.10.4",
+    "tailwindcss": "^4.3.1",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.9"
+  }
+}

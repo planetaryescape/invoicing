@@ -3,9 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "packageManager": "bun@1.3.4",
-  "workspaces": ["core", "shared", "server"],
+  "workspaces": ["core", "shared", "server", "web"],
   "scripts": {
-    "dev": "turbo run dev --filter=@invoicing/server",
+    "dev": "turbo run dev",
+    "dev:server": "turbo run dev --filter=@invoicing/server",
+    "dev:web": "turbo run dev --filter=@invoicing/web",
     "build": "turbo run build",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
