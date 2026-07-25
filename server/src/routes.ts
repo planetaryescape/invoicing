@@ -1,4 +1,4 @@
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Path } from "effect"
 import { BunFileSystem, BunPath } from "@effect/platform-bun"
 import { HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http"
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc"
@@ -14,8 +14,8 @@ import { InvoicingHandlersLive, makeCoreServicesLayer } from "./handlers.ts"
 const errorResponse = (message: string, status: number) =>
   HttpServerResponse.jsonUnsafe({ error: message }, { status })
 
-const webRoot = new URL("./public/", import.meta.url).pathname
 const assetFileNamePattern = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/
+const webRoot = Path.Path.use((path) => path.fromFileUrl(new URL("./public/", import.meta.url)))
 
 const parseInvoiceId = Effect.fn("PdfRoute.parseInvoiceId")(function* () {
   const { id } = yield* HttpRouter.params
@@ -54,9 +54,11 @@ export const PdfRoutes = Layer.mergeAll(
   HttpRouter.add("GET", "/api/invoices/:id/receipt/pdf", pdfHandler("receipt")),
 )
 
-const indexResponse = HttpServerResponse.file(`${webRoot}index.html`).pipe(
-  Effect.catch(() => Effect.succeed(errorResponse("Web application is not built", 503))),
-)
+const indexResponse = Effect.gen(function* () {
+  const path = yield* Path.Path
+  const root = yield* webRoot
+  return yield* HttpServerResponse.file(path.join(root, "index.html"))
+}).pipe(Effect.catch(() => Effect.succeed(errorResponse("Web application is not built", 503))))
 
 export const WebRoutes = Layer.mergeAll(
   HttpRouter.add("GET", "/assets/:file", Effect.gen(function* () {
@@ -64,7 +66,9 @@ export const WebRoutes = Layer.mergeAll(
     if (file === undefined || !assetFileNamePattern.test(file)) {
       return errorResponse("Asset not found", 404)
     }
-    return yield* HttpServerResponse.file(`${webRoot}assets/${file}`).pipe(
+    const path = yield* Path.Path
+    const root = yield* webRoot
+    return yield* HttpServerResponse.file(path.join(root, "assets", file)).pipe(
       Effect.catch(() => Effect.succeed(errorResponse("Asset not found", 404))),
     )
   })),
@@ -101,7 +105,7 @@ const makeApiRoutes = <E>(databaseLayer: Layer.Layer<Database, E>) => {
 }
 
 export const makeAppRoutes = <E>(databaseLayer: Layer.Layer<Database, E>) =>
-  Layer.mergeAll(makeApiRoutes(databaseLayer), WebRoutes)
+  Layer.mergeAll(makeApiRoutes(databaseLayer), WebRoutes.pipe(Layer.provide(BunPath.layer)))
 
 export const makeWebHandler = <E>(databaseLayer: Layer.Layer<Database, E>) =>
   HttpRouter.toWebHandler(

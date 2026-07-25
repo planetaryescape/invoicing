@@ -15,10 +15,8 @@ import {
 } from "../message.ts"
 import { editInvoiceRouter, invoiceRouter, newInvoiceRouter } from "../route.ts"
 import { actionButton, selectField, textAreaField, textField } from "./form.ts"
+import { formatCurrency } from "./format.ts"
 import { pageHeading } from "./shell.ts"
-
-const formatCurrency = (amount: number, currency: string): string =>
-  new Intl.NumberFormat("en-ZA", { style: "currency", currency }).format(amount)
 
 export const invoicesView = (data: ApplicationData): Html => {
   const h = html<Message>()
@@ -80,7 +78,7 @@ export const invoiceDetailView = (model: Model, data: ApplicationData): Html => 
   })
 }
 
-export const invoiceFormView = (model: Model, data: ApplicationData): Html => {
+const loadedInvoiceFormView = (model: Model, data: ApplicationData): Html => {
   const h = html<Message>()
   const form = model.invoiceForm
   const customerOptions: ReadonlyArray<readonly [string, string]> = [["", "Select a customer"], ...data.customers.map((item) => [String(item.id), item.name] as const)]
@@ -93,7 +91,7 @@ export const invoiceFormView = (model: Model, data: ApplicationData): Html => {
         selectField("invoice-customer", "Customer", form.customerId, customerOptions, (value) => UpdatedInvoiceForm({ field: "customerId", value })),
         textField("invoice-due", "Due date", form.dueDate, (value) => UpdatedInvoiceForm({ field: "dueDate", value }), { type: "date", required: true }),
         selectField("invoice-bank", "Bank account", form.bankAccountId, bankOptions, (value) => UpdatedInvoiceForm({ field: "bankAccountId", value })),
-        textField("invoice-vat", "VAT rate", form.vatRate, (value) => UpdatedInvoiceForm({ field: "vatRate", value }), { type: "number", placeholder: "Business default" }),
+        textField("invoice-vat", "VAT rate", form.vatRate, (value) => UpdatedInvoiceForm({ field: "vatRate", value }), { type: "number", placeholder: "Business default", min: "0", max: "100", step: "any" }),
         textAreaField("invoice-notes", "Invoice notes", form.notes, (value) => UpdatedInvoiceForm({ field: "notes", value })),
       ]),
       h.section([h.Class("panel")], [
@@ -101,9 +99,9 @@ export const invoiceFormView = (model: Model, data: ApplicationData): Html => {
         h.div([h.Class("line-items")], form.lineItems.map((item, index) => h.keyed("fieldset")(String(item.key), [h.Class("line-item")], [
           h.legend([], [`Line ${index + 1}`]),
           selectField(`line-product-${item.key}`, "Product", item.productId, productOptions, (value) => UpdatedLineItem({ key: item.key, field: "productId", value })),
-          textField(`line-description-${item.key}`, "Description", item.description, (value) => UpdatedLineItem({ key: item.key, field: "description", value }), { required: true }),
-          textField(`line-quantity-${item.key}`, "Quantity", item.quantity, (value) => UpdatedLineItem({ key: item.key, field: "quantity", value }), { type: "number", required: true }),
-          textField(`line-price-${item.key}`, "Unit price", item.unitPrice, (value) => UpdatedLineItem({ key: item.key, field: "unitPrice", value }), { type: "number" }),
+          textField(`line-description-${item.key}`, "Description", item.description, (value) => UpdatedLineItem({ key: item.key, field: "description", value }), { required: item.productId === "" }),
+          textField(`line-quantity-${item.key}`, "Quantity", item.quantity, (value) => UpdatedLineItem({ key: item.key, field: "quantity", value }), { type: "number", required: true, min: "0.01", step: "any" }),
+          textField(`line-price-${item.key}`, "Unit price", item.unitPrice, (value) => UpdatedLineItem({ key: item.key, field: "unitPrice", value }), { type: "number", required: item.productId === "", min: "0", step: "any" }),
           textField(`line-notes-${item.key}`, "Additional notes", item.additionalNotes, (value) => UpdatedLineItem({ key: item.key, field: "additionalNotes", value })),
           ...(form.lineItems.length > 1 ? [actionButton("Remove line", ClickedRemoveLineItem({ key: item.key }), { kind: "danger" })] : []),
         ]))),
@@ -111,4 +109,22 @@ export const invoiceFormView = (model: Model, data: ApplicationData): Html => {
       h.div([h.Class("form-actions")], [actionButton(model.submission === "Submitting" ? "Saving invoice…" : "Save invoice", SubmittedInvoiceForm(), { kind: "primary", type: "submit", disabled: model.submission === "Submitting" })]),
     ]),
   ])
+}
+
+export const invoiceFormView = (model: Model, data: ApplicationData): Html => {
+  const h = html<Message>()
+  if (model.route._tag !== "EditInvoice") {
+    return loadedInvoiceFormView(model, data)
+  }
+  const invoiceId = model.route.id
+  return AsyncData.matchDataSplitEmpty(model.selectedInvoice, {
+    onIdle: () => h.div([h.Class("loading-panel"), h.Role("status")], [h.h1([], ["Invoice"]), h.p([], ["Preparing invoice…"])]),
+    onLoading: () => h.div([h.Class("loading-panel"), h.Role("status")], [h.h1([], ["Invoice"]), h.p([], ["Loading invoice…"])]),
+    onFailure: (error) => h.div([h.Class("error-panel"), h.Role("alert")], [
+      h.h1([], ["Could not load invoice"]),
+      h.p([], [error]),
+      actionButton("Try again", ClickedRetryInvoice({ id: invoiceId }), { kind: "primary" }),
+    ]),
+    onData: () => loadedInvoiceFormView(model, data),
+  })
 }

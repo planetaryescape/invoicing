@@ -7,7 +7,7 @@ export const textField = (
   label: string,
   value: string,
   onInput: (value: string) => Message,
-  options: { type?: string; placeholder?: string; required?: boolean } = {},
+  options: { type?: string; placeholder?: string; required?: boolean; min?: string; max?: string; step?: string } = {},
 ): Html => {
   const h = html<Message>()
   return Input.view<Message>({
@@ -21,8 +21,12 @@ export const textField = (
         ...attributes.input,
         h.Type(options.type ?? "text"),
         h.Class("field-input"),
-        ...(options.required === true ? [h.AriaRequired(true)] : []),
+        ...(options.required === true ? [h.AriaRequired(true), h.Required(true)] : []),
+        ...(options.min === undefined ? [] : [h.Min(options.min)]),
+        ...(options.max === undefined ? [] : [h.Max(options.max)]),
+        ...(options.step === undefined ? [] : [h.Step(options.step)]),
       ]),
+      h.span([...attributes.description, h.Class("visually-hidden")], [options.required === true ? `${label} is required.` : `${label} is optional.`]),
     ]),
   })
 }
@@ -41,6 +45,7 @@ export const textAreaField = (
     toView: (attributes) => h.div([h.Class("field field-wide")], [
       h.label([...attributes.label, h.Class("field-label")], [label]),
       h.textarea([...attributes.textarea, h.Class("field-input field-textarea")], []),
+      h.span([...attributes.description, h.Class("visually-hidden")], [`${label} is optional.`]),
     ]),
   })
 }
@@ -63,6 +68,7 @@ export const selectField = (
         [...attributes.select, h.Class("field-input")],
         options.map(([optionValue, optionLabel]) => h.option([h.Value(optionValue)], [optionLabel])),
       ),
+      h.span([...attributes.description, h.Class("visually-hidden")], [`Choose ${label.toLowerCase()} from the available options.`]),
     ]),
   })
 }
@@ -77,7 +83,7 @@ export const actionButton = (
     type: "submit",
     isDisabled: options.disabled ?? false,
     toView: (attributes) => h.button(
-      [...attributes.button, h.Class(`button button-${options.kind ?? "quiet"}`)],
+      [...attributes.button, h.Class(`button button-${options.kind ?? "quiet"}`), h.Disabled(options.disabled ?? false)],
       [label],
     ),
   }) : Button.view<Message>({
@@ -85,7 +91,7 @@ export const actionButton = (
     isDisabled: options.disabled ?? false,
     onClick: message,
     toView: (attributes) => h.button(
-      [...attributes.button, h.Class(`button button-${options.kind ?? "quiet"}`)],
+      [...attributes.button, h.Class(`button button-${options.kind ?? "quiet"}`), h.Disabled(options.disabled ?? false)],
       [label],
     ),
   })

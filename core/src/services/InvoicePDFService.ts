@@ -40,8 +40,18 @@ export const InvoicePDFServiceLive = Layer.effect(
     const path = yield* Path.Path
     const logoRoot = path.resolve("uploads")
 
+    const resolveLogoCandidate = (fileName: string): string => {
+      if (path.isAbsolute(fileName)) {
+        return path.resolve(fileName)
+      }
+      if (path.basename(fileName) === fileName) {
+        return path.resolve(logoRoot, fileName)
+      }
+      return path.resolve(fileName)
+    }
+
     const resolveLogoPath = (fileName: string): string | undefined => {
-      const filePath = path.resolve(logoRoot, fileName)
+      const filePath = resolveLogoCandidate(fileName)
       const relativePath = path.relative(logoRoot, filePath)
       return relativePath !== "" && relativePath === path.basename(filePath)
         ? filePath

@@ -12,6 +12,7 @@ body { margin: 0; min-width: 320px; min-height: 100vh; background: #f1f4ed; }
 a { color: inherit; text-decoration: none; }
 button, input, select, textarea { font: inherit; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #e2b96d; outline-offset: 2px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 250px minmax(0, 1fr); }
 .sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; padding: 28px 20px; color: #f4f1e7; background: #10231d; border-right: 1px solid #284339; }
@@ -46,7 +47,7 @@ button.stat-card { cursor: pointer; }
 .stat-label { font-size: .7rem; font-weight: 750; text-transform: uppercase; letter-spacing: .14em; opacity: .68; }
 .stat-card strong { font: 500 1.55rem/1.25 Georgia, serif; }
 
-.panel, .account-card, .invoice-meta, .totals-card, .invoice-form { background: #fbfcf8; border: 1px solid #dce2d9; border-radius: 10px; }
+.panel, .account-card, .invoice-meta, .totals-card { background: #fbfcf8; border: 1px solid #dce2d9; border-radius: 10px; }
 .panel { padding: 22px; margin-bottom: 20px; }
 .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
 .panel-heading h2, .status-actions h2 { margin: 0; font: 500 1.35rem Georgia, serif; }
@@ -67,7 +68,7 @@ td small { display: block; margin-top: 4px; color: #77857e; }
 .field-input { width: 100%; min-height: 43px; padding: 10px 12px; color: #183027; background: #fff; border: 1px solid #bdc9c2; border-radius: 6px; }
 .field-textarea { min-height: 100px; resize: vertical; }
 .form-actions { display: flex; justify-content: flex-end; gap: 10px; }
-.invoice-form { display: grid; gap: 20px; padding: 0; background: transparent; border: 0; }
+.invoice-form { display: grid; gap: 20px; padding: 0; }
 .line-items { display: grid; gap: 16px; }
 .line-item { display: grid; grid-template-columns: repeat(5, minmax(130px, 1fr)); gap: 12px; padding: 18px; border: 1px solid #dce2d9; border-radius: 8px; }
 .line-item legend { padding: 0 8px; color: #8b6934; font-size: .72rem; font-weight: 750; text-transform: uppercase; letter-spacing: .1em; }

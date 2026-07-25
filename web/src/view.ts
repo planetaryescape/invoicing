@@ -29,6 +29,9 @@ const pageTitle = (model: Model): string => `${M.value(model.route).pipe(
 
 const routeView = (model: Model): Html => {
   const h = html<Message>()
+  if (model.route._tag === "NotFound") {
+    return h.div([h.Class("empty-state")], [h.h1([], ["Page not found"]), h.p([], [`No route matches ${model.route.path}`])])
+  }
   return AsyncData.matchDataSplitEmpty(model.data, {
     onIdle: () => h.div([h.Class("loading-panel"), h.Role("status")], [h.h1([], ["Invoicing"]), h.p([], ["Preparing your workspace…"])]),
     onLoading: () => h.div([h.Class("loading-panel"), h.Role("status")], [h.h1([], ["Invoicing"]), h.p([], ["Loading invoicing data…"])]),
@@ -40,7 +43,7 @@ const routeView = (model: Model): Html => {
       Products: () => productsView(data), NewProduct: () => productFormView(model), EditProduct: () => productFormView(model),
       BankAccounts: () => bankAccountsView(data), NewBankAccount: () => bankAccountFormView(model), EditBankAccount: () => bankAccountFormView(model),
       BusinessInfo: () => businessInfoView(model),
-      NotFound: ({ path }) => h.div([h.Class("empty-state")], [h.h1([], ["Page not found"]), h.p([], [`No route matches ${path}`])]),
+      NotFound: () => h.empty,
     })),
   })
 }

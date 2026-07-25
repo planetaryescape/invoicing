@@ -84,10 +84,15 @@ const toInvoiceForm = (invoice: InvoiceWithLineItems): InvoiceForm => ({
 
 const parseOptionalNumber = (value: string): number | null => value.trim() === "" ? null : Number(value)
 const isValidOptionalNumber = (value: string): boolean => value.trim() === "" || Number.isFinite(Number(value))
+const isValidOptionalVatRate = (value: string): boolean => {
+  const vatRate = parseOptionalNumber(value)
+  return vatRate === null || (Number.isFinite(vatRate) && vatRate >= 0 && vatRate <= 100)
+}
 const emptyToNull = (value: string): string | null => value.trim() === "" ? null : value.trim()
 
 const invoiceInput = (form: InvoiceForm): Option.Option<InvoiceInput> => {
   const customerId = Number(form.customerId)
+  const vatRate = parseOptionalNumber(form.vatRate)
   const lineItems = form.lineItems.map((item) => ({
     productId: parseOptionalNumber(item.productId),
     ...(item.description.trim() === "" ? {} : { description: item.description.trim() }),
@@ -101,7 +106,14 @@ const invoiceInput = (form: InvoiceForm): Option.Option<InvoiceInput> => {
     || !Number.isFinite(customerId)
     || !isValidOptionalNumber(form.bankAccountId)
     || !isValidOptionalNumber(form.vatRate)
-    || lineItems.some((item) => !Number.isFinite(item.quantity) || (item.unitPrice !== undefined && !Number.isFinite(item.unitPrice)))
+    || (vatRate !== null && (vatRate < 0 || vatRate > 100))
+    || lineItems.some((item) =>
+      !Number.isFinite(item.quantity)
+      || item.quantity <= 0
+      || (item.unitPrice !== undefined && (!Number.isFinite(item.unitPrice) || item.unitPrice < 0))
+      || (item.productId === null && (item.description === undefined || item.unitPrice === undefined))
+      || (item.productId !== null && !Number.isFinite(item.productId))
+    )
   ) {
     return Option.none()
   }
@@ -109,7 +121,7 @@ const invoiceInput = (form: InvoiceForm): Option.Option<InvoiceInput> => {
     customerId,
     bankAccountId: parseOptionalNumber(form.bankAccountId),
     dueDate: form.dueDate,
-    vatRate: parseOptionalNumber(form.vatRate),
+    vatRate,
     notes: emptyToNull(form.notes),
     lineItems,
   })
@@ -143,7 +155,7 @@ const prepareRoute = (model: Model, route: AppRoute): readonly [Model, ReadonlyA
     M.tag("EditBankAccount", ({ id }) => [Option.match(maybeData, { onNone: () => evo(next, { bankAccountForm: emptyBankAccountForm }), onSome: (data) => Option.match(Array.findFirst(data.bankAccounts, (item) => item.id === id), { onNone: () => evo(next, { bankAccountForm: emptyBankAccountForm }), onSome: (item) => evo(next, { bankAccountForm: () => toBankAccountForm(item) }) }) }), []]),
     M.tag("BusinessInfo", () => [Option.match(maybeData, { onNone: () => next, onSome: (data) => Option.match(data.businessInfo, { onNone: () => evo(next, { businessInfoForm: emptyBusinessInfoForm }), onSome: (info) => evo(next, { businessInfoForm: () => toBusinessInfoForm(info) }) }) }), []]),
     M.tag("Invoice", ({ id }) => [evo(next, { selectedInvoice: () => InvoiceDataState.Loading() }), [LoadInvoice({ id })]]),
-    M.tag("EditInvoice", ({ id }) => [evo(next, { selectedInvoice: () => InvoiceDataState.Loading() }), [LoadInvoice({ id })]]),
+    M.tag("EditInvoice", ({ id }) => [evo(next, { selectedInvoice: () => InvoiceDataState.Loading(), invoiceForm: emptyInvoiceForm }), [LoadInvoice({ id })]]),
     M.orElse(() => [next, []]),
   )
 }
@@ -227,10 +239,10 @@ export const update = (model: Model, message: Message): UpdateReturn =>
       ClickedAddLineItem: () => [evo(model, { invoiceForm: (form) => evo(form, { lineItems: (items) => Array.append(items, emptyLineItemForm(form.nextLineKey)), nextLineKey: (key) => key + 1 }) }), []],
       ClickedRemoveLineItem: ({ key }) => [evo(model, { invoiceForm: (form) => evo(form, { lineItems: Array.filter((item) => item.key !== key) }) }), []],
       SubmittedCustomerForm: () => model.customerForm.name.trim() === "" ? failForm(model, "Customer name is required") : runMutation(model, SaveCustomer({ id: model.customerForm.id, input: { name: model.customerForm.name, vatNumber: emptyToNull(model.customerForm.vatNumber), streetAddress: model.customerForm.streetAddress, city: model.customerForm.city, postalCode: model.customerForm.postalCode, country: model.customerForm.country, email: model.customerForm.email, phone: model.customerForm.phone } }), customersRouter()),
-      SubmittedProductForm: () => model.productForm.name.trim() === "" || model.productForm.defaultPrice.trim() === "" || !Number.isFinite(Number(model.productForm.defaultPrice)) ? failForm(model, "Product name and price are required") : runMutation(model, SaveProduct({ id: model.productForm.id, input: { name: model.productForm.name, description: emptyToNull(model.productForm.description), defaultPrice: Number(model.productForm.defaultPrice) } }), productsRouter()),
+      SubmittedProductForm: () => model.productForm.name.trim() === "" || model.productForm.defaultPrice.trim() === "" || !Number.isFinite(Number(model.productForm.defaultPrice)) || Number(model.productForm.defaultPrice) < 0 ? failForm(model, "Product name and a non-negative price are required") : runMutation(model, SaveProduct({ id: model.productForm.id, input: { name: model.productForm.name, description: emptyToNull(model.productForm.description), defaultPrice: Number(model.productForm.defaultPrice) } }), productsRouter()),
       SubmittedBankAccountForm: () => model.bankAccountForm.label.trim() === "" ? failForm(model, "Account label is required") : runMutation(model, SaveBankAccount({ id: model.bankAccountForm.id, input: { label: model.bankAccountForm.label, currency: model.bankAccountForm.currency, accountHolderName: model.bankAccountForm.accountHolderName, bankName: model.bankAccountForm.bankName, accountNumber: emptyToNull(model.bankAccountForm.accountNumber), branchCode: emptyToNull(model.bankAccountForm.branchCode), iban: emptyToNull(model.bankAccountForm.iban), swiftBic: emptyToNull(model.bankAccountForm.swiftBic), bankAddress: emptyToNull(model.bankAccountForm.bankAddress), isDefault: model.bankAccountForm.isDefault } }), bankAccountsRouter()),
-      SubmittedBusinessInfoForm: () => model.businessInfoForm.companyName.trim() === "" || !isValidOptionalNumber(model.businessInfoForm.defaultVatRate) ? failForm(model, "Company name and VAT rate must be valid") : runMutation(model, SaveBusinessInfo({ input: { ...model.businessInfoForm, defaultVatRate: parseOptionalNumber(model.businessInfoForm.defaultVatRate), logoPath: null } }), businessInfoRouter()),
-      SubmittedInvoiceForm: () => Option.match(invoiceInput(model.invoiceForm), { onNone: () => failForm(model, "Invoice fields contain invalid numbers"), onSome: (input) => runMutation(model, SaveInvoice({ id: model.invoiceForm.id, input }), invoicesRouter()) }),
+      SubmittedBusinessInfoForm: () => model.businessInfoForm.companyName.trim() === "" || !isValidOptionalVatRate(model.businessInfoForm.defaultVatRate) ? failForm(model, "Company name and a VAT rate from 0 to 100 are required") : runMutation(model, SaveBusinessInfo({ input: { ...model.businessInfoForm, defaultVatRate: parseOptionalNumber(model.businessInfoForm.defaultVatRate) } }), businessInfoRouter()),
+      SubmittedInvoiceForm: () => Option.match(invoiceInput(model.invoiceForm), { onNone: () => failForm(model, "Complete the invoice with valid positive quantities and prices"), onSome: (input) => runMutation(model, SaveInvoice({ id: model.invoiceForm.id, input }), invoicesRouter()) }),
       ClickedDeleteCustomer: ({ id }) => runMutation(model, DeleteCustomer({ id }), customersRouter()),
       ClickedDeleteProduct: ({ id }) => runMutation(model, DeleteProduct({ id }), productsRouter()),
       ClickedDeleteBankAccount: ({ id }) => runMutation(model, DeleteBankAccount({ id }), bankAccountsRouter()),

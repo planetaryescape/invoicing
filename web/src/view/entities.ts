@@ -31,10 +31,8 @@ import {
   newProductRouter,
 } from "../route.ts"
 import { actionButton, selectField, textAreaField, textField } from "./form.ts"
+import { formatAmount, formatCurrency } from "./format.ts"
 import { pageHeading } from "./shell.ts"
-
-const formatCurrency = (amount: number, currency: string): string =>
-  new Intl.NumberFormat("en-ZA", { style: "currency", currency }).format(amount)
 
 const editLink = (href: string): Html => {
   const h = html<Message>()
@@ -119,7 +117,7 @@ export const productsView = (data: ApplicationData): Html => {
     h.section([h.Class("panel table-scroll")], [h.table([], [
       h.thead([], [h.tr([], [h.th([], ["Product"]), h.th([], ["Description"]), h.th([h.Class("numeric")], ["Default price"]), h.th([], ["Actions"])])]),
       h.tbody([], data.products.map((product) => h.keyed("tr")(String(product.id), [], [
-        h.td([], [h.strong([], [product.name])]), h.td([], [product.description ?? "—"]), h.td([h.Class("numeric")], [formatCurrency(product.defaultPrice, "ZAR")]),
+        h.td([], [h.strong([], [product.name])]), h.td([], [product.description ?? "—"]), h.td([h.Class("numeric")], [formatAmount(product.defaultPrice)]),
         h.td([h.Class("actions")], [editLink(editProductRouter({ id: product.id })), actionButton("Delete", ClickedDeleteProduct({ id: product.id }), { kind: "danger" })]),
       ]))),
     ])])])
@@ -130,7 +128,7 @@ export const productFormView = (model: Model): Html => {
   const title = Option.isSome(model.productForm.id) ? "Edit product" : "New product"
   return h.div([], [pageHeading("Products", title), h.form([h.Class("panel form-grid"), h.OnSubmit(SubmittedProductForm())], [
     textField("product-name", "Name", model.productForm.name, (value) => UpdatedProductForm({ field: "name", value }), { required: true }),
-    textField("product-price", "Default price", model.productForm.defaultPrice, (value) => UpdatedProductForm({ field: "defaultPrice", value }), { type: "number", required: true }),
+    textField("product-price", "Default price", model.productForm.defaultPrice, (value) => UpdatedProductForm({ field: "defaultPrice", value }), { type: "number", required: true, min: "0", step: "any" }),
     textAreaField("product-description", "Description", model.productForm.description, (value) => UpdatedProductForm({ field: "description", value })),
     h.div([h.Class("form-actions field-wide")], [actionButton("Save product", SubmittedProductForm(), { kind: "primary", type: "submit" })]),
   ])])
@@ -154,7 +152,9 @@ export const bankAccountFormView = (model: Model): Html => {
     input("label", "Label"), selectField("bank-currency", "Currency", form.currency, [["ZAR", "ZAR"], ["USD", "USD"], ["EUR", "EUR"], ["GBP", "GBP"]], (value) => UpdatedBankAccountForm({ field: "currency", value })),
     input("accountHolderName", "Account holder"), input("bankName", "Bank name"), input("accountNumber", "Account number"), input("branchCode", form.currency === "GBP" ? "Sort code" : form.currency === "USD" ? "Routing number" : "Branch code"),
     input("iban", "IBAN"), input("swiftBic", "SWIFT / BIC"), input("bankAddress", "Bank address"),
-    actionButton(form.isDefault ? "Will be default" : "Make default", ToggledBankAccountDefault({ value: !form.isDefault })),
+    form.isDefault
+      ? h.span([h.Class("default-badge")], ["Default account"])
+      : actionButton("Make default", ToggledBankAccountDefault({ value: true })),
     h.div([h.Class("form-actions field-wide")], [actionButton("Save account", SubmittedBankAccountForm(), { kind: "primary", type: "submit" })]),
   ])])
 }
@@ -165,7 +165,7 @@ export const businessInfoView = (model: Model): Html => {
   const input = (field: Parameters<typeof UpdatedBusinessInfoForm>[0]["field"], label: string, type = "text") => textField(`business-${field}`, label, form[field], (value) => UpdatedBusinessInfoForm({ field, value }), { type })
   return h.div([], [pageHeading("Settings", "Business information"), h.form([h.Class("panel form-grid"), h.OnSubmit(SubmittedBusinessInfoForm())], [
     input("companyName", "Company name"), input("vatNumber", "VAT number"), input("email", "Email", "email"), input("phone", "Phone", "tel"),
-    input("streetAddress", "Street address"), input("city", "City"), input("postalCode", "Postal code"), input("country", "Country"), input("defaultVatRate", "Default VAT rate", "number"),
+    input("streetAddress", "Street address"), input("city", "City"), input("postalCode", "Postal code"), input("country", "Country"), textField("business-defaultVatRate", "Default VAT rate", form.defaultVatRate, (value) => UpdatedBusinessInfoForm({ field: "defaultVatRate", value }), { type: "number", min: "0", max: "100", step: "any" }),
     h.div([h.Class("section-label field-wide")], ["Legacy payment details"]), input("accountHolderName", "Account holder"), input("bankName", "Bank name"), input("accountNumber", "Account number"), input("branchCode", "Branch code"),
     h.div([h.Class("form-actions field-wide")], [actionButton("Save business information", SubmittedBusinessInfoForm(), { kind: "primary", type: "submit" })]),
   ])])
