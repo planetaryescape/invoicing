@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Schema } from "effect"
+import { Context, Effect, Encoding, FileSystem, Layer, Path, Schema } from "effect"
 import { InvoiceService } from "./InvoiceService.ts"
 import { CustomerService } from "./CustomerService.ts"
 import { BusinessInfoService } from "./BusinessInfoService.ts"
@@ -6,8 +6,6 @@ import { BankAccountService } from "./BankAccountService.ts"
 import { PDFService, PDFError } from "./PDFService.ts"
 import { DatabaseError } from "./Database.ts"
 import { generateInvoiceHTML, generateReceiptHTML } from "../templates/invoice-template.ts"
-import { readFile } from "node:fs/promises"
-import { join } from "node:path"
 
 export class InvoicePDFError extends Schema.TaggedErrorClass<InvoicePDFError>()("InvoicePDFError", {
   message: Schema.String,
@@ -38,6 +36,46 @@ export const InvoicePDFServiceLive = Layer.effect(
     const businessInfoService = yield* BusinessInfoService
     const bankAccountService = yield* BankAccountService
     const pdfService = yield* PDFService
+    const fileSystem = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
+    const projectRoot = path.resolve(".")
+    const logoRoot = path.resolve("uploads")
+
+    const isWithin = (root: string, filePath: string): boolean => {
+      const relativePath = path.relative(root, filePath)
+      return relativePath !== ""
+        && !path.isAbsolute(relativePath)
+        && relativePath !== ".."
+        && !relativePath.startsWith(`..${path.sep}`)
+    }
+
+    const legacyFileName = (fileName: string): string => {
+      if (!path.isAbsolute(fileName)) {
+        return fileName
+      }
+      return path.relative(path.parse(fileName).root, fileName)
+    }
+
+    const resolveLogoPath = Effect.fn("InvoicePDFService.resolveLogoPath")(function* (fileName: string) {
+      if (![".jpeg", ".jpg", ".png", ".svg"].includes(path.extname(fileName).toLowerCase())) {
+        return undefined
+      }
+
+      if (path.isAbsolute(fileName) && isWithin(logoRoot, fileName)) {
+        return path.resolve(fileName)
+      }
+
+      if (path.basename(fileName) === fileName) {
+        const uploadPath = path.resolve(logoRoot, fileName)
+        const uploadExists = yield* fileSystem.exists(uploadPath).pipe(Effect.orElseSucceed(() => false))
+        if (uploadExists) {
+          return uploadPath
+        }
+      }
+
+      const legacyPath = path.resolve(projectRoot, legacyFileName(fileName))
+      return isWithin(projectRoot, legacyPath) ? legacyPath : undefined
+    })
 
     const buildTemplateData = (invoiceId: number) =>
       Effect.gen(function* () {
@@ -64,16 +102,18 @@ export const InvoicePDFServiceLive = Layer.effect(
 
         let logoDataUrl: string | undefined
         if (businessInfo.logoPath) {
-          const logoPath = join(process.cwd(), businessInfo.logoPath)
-          const logoBuffer = yield* Effect.tryPromise({
-            try: () => readFile(logoPath),
-            catch: () => InvoicePDFError.new(`Failed to read logo file: ${businessInfo.logoPath}`),
-          }).pipe(Effect.orElseSucceed(() => undefined))
+          const logoPath = yield* resolveLogoPath(businessInfo.logoPath)
+          const logoBuffer = logoPath === undefined
+            ? undefined
+            : yield* fileSystem.readFile(logoPath).pipe(
+              Effect.mapError(() => InvoicePDFError.new(`Failed to read logo file: ${businessInfo.logoPath}`)),
+              Effect.orElseSucceed(() => undefined),
+            )
 
           if (logoBuffer) {
             const ext = businessInfo.logoPath.split(".").pop()?.toLowerCase()
             const mimeType = ext === "svg" ? "image/svg+xml" : ext === "png" ? "image/png" : "image/jpeg"
-            logoDataUrl = `data:${mimeType};base64,${logoBuffer.toString("base64")}`
+            logoDataUrl = `data:${mimeType};base64,${Encoding.encodeBase64(logoBuffer)}`
           }
         }
 

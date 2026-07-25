@@ -50,15 +50,15 @@ bank_accounts: id, label, currency (e.g. "ZAR","USD","EUR"),
 - `formatCurrency(amount, currency)` — use the invoice's currency code instead of hardcoded ZAR.
 - Bank details section uses the invoice's bank account, not `business_info`.
 
-## Phase 4: Web — API routes
+## Phase 4: Server API
 
-**`web/src/routes/bank-accounts.ts`** — New Hono router:
+Bank account operations are exposed through the typed Effect RPC contract:
 
-- `GET /` — list all bank accounts
-- `POST /` — create bank account
-- `PUT /:id` — update bank account
-- `DELETE /:id` — delete bank account
-- `PATCH /:id/default` — set as default
+- `listBankAccounts`
+- `createBankAccount`
+- `updateBankAccount`
+- `deleteBankAccount`
+- `setDefaultBankAccount`
 
 ## Phase 5: Web — UI pages
 
