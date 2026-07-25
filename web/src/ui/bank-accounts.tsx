@@ -3,11 +3,26 @@
 import { Hono } from "hono"
 import { Layout } from "./Layout.tsx"
 import { Effect } from "effect"
-import { BankAccountService, AppRuntime } from "@invoicing/core"
+import { BankAccountService, AppRuntime, routingCodeLabel } from "@invoicing/core"
 
 const app = new Hono()
 
 const CURRENCIES = ["ZAR", "USD", "EUR", "GBP"]
+
+// Keeps the local routing code field (branch code / sort code / routing number)
+// labelled per the selected currency.
+const routingLabelScript = `
+const routingLabels = { GBP: "Sort Code", USD: "Routing Number" }
+const routingPlaceholders = { ZAR: "e.g. 250655", GBP: "e.g. 23-14-70", USD: "e.g. 021000021" }
+const currencySelect = document.getElementById("currency")
+const syncRoutingField = () => {
+  const cur = currencySelect.value
+  document.getElementById("branchCodeLabel").textContent = routingLabels[cur] || "Branch Code"
+  document.getElementById("branchCode").placeholder = routingPlaceholders[cur] || ""
+}
+currencySelect.addEventListener("change", syncRoutingField)
+syncRoutingField()
+`
 
 app.get("/", async (c) => {
   const bankAccounts = await AppRuntime.runPromise(
@@ -127,8 +142,8 @@ app.get("/new", (c) => {
               </div>
 
               <div class="form-group">
-                <label for="branchCode">Branch Code</label>
-                <input type="text" id="branchCode" name="branchCode" />
+                <label for="branchCode"><span id="branchCodeLabel">{routingCodeLabel("ZAR")}</span></label>
+                <input type="text" id="branchCode" name="branchCode" placeholder="e.g. 250655" />
               </div>
 
               <div class="form-group">
@@ -147,7 +162,7 @@ app.get("/new", (c) => {
               </div>
 
               <div class="form-group full-width">
-                <p class="form-hint">For local accounts use Account Number + Branch Code. For international accounts use IBAN + SWIFT/BIC.</p>
+                <p class="form-hint">For local accounts use Account Number + Branch Code. For international accounts use IBAN + SWIFT/BIC. Some accounts (e.g. Wise GBP) use both — fill in Account Number + Sort Code for UK transfers and IBAN + SWIFT/BIC for international.</p>
               </div>
 
               <div class="form-group full-width">
@@ -165,6 +180,8 @@ app.get("/new", (c) => {
           </div>
         </form>
       </div>
+
+      <script dangerouslySetInnerHTML={{ __html: routingLabelScript }} />
     </Layout>
   )
 })
@@ -248,7 +265,7 @@ app.get("/:id", async (c) => {
               </div>
 
               <div class="form-group">
-                <label for="branchCode">Branch Code</label>
+                <label for="branchCode"><span id="branchCodeLabel">{routingCodeLabel(account.currency)}</span></label>
                 <input type="text" id="branchCode" name="branchCode" value={account.branchCode ?? ""} />
               </div>
 
@@ -268,7 +285,7 @@ app.get("/:id", async (c) => {
               </div>
 
               <div class="form-group full-width">
-                <p class="form-hint">For local accounts use Account Number + Branch Code. For international accounts use IBAN + SWIFT/BIC.</p>
+                <p class="form-hint">For local accounts use Account Number + Branch Code. For international accounts use IBAN + SWIFT/BIC. Some accounts (e.g. Wise GBP) use both — fill in Account Number + Sort Code for UK transfers and IBAN + SWIFT/BIC for international.</p>
               </div>
 
               <div class="form-group full-width">
@@ -286,6 +303,8 @@ app.get("/:id", async (c) => {
           </div>
         </form>
       </div>
+
+      <script dangerouslySetInnerHTML={{ __html: routingLabelScript }} />
     </Layout>
   )
 })

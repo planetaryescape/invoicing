@@ -92,6 +92,10 @@ export interface BankAccount {
   accountHolderName: string
   bankName: string
   accountNumber: string | null
+  /**
+   * Generic local routing code — branch code (ZA), sort code (GB),
+   * routing number (US). Use `routingCodeLabel(currency)` for display.
+   */
   branchCode: string | null
   iban: string | null
   swiftBic: string | null
@@ -100,12 +104,28 @@ export interface BankAccount {
   createdAt: string
 }
 
+/**
+ * Display label for the local routing code field, per currency.
+ * GBP → Sort Code, USD → Routing Number, everything else → Branch Code.
+ */
+export const routingCodeLabel = (currency: string): string => {
+  switch (currency) {
+    case "GBP":
+      return "Sort Code"
+    case "USD":
+      return "Routing Number"
+    default:
+      return "Branch Code"
+  }
+}
+
 export interface CreateBankAccountInput {
   label: string
   currency: string
   accountHolderName: string
   bankName: string
   accountNumber?: string | null
+  /** Local routing code — branch code (ZA), sort code (GB), routing number (US). */
   branchCode?: string | null
   iban?: string | null
   swiftBic?: string | null
