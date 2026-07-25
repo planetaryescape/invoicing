@@ -139,6 +139,18 @@ describe("BankAccountService", () => {
     expect(updated.currency).toBe("EUR")
   })
 
+  test("should not unset the default account during an update", async () => {
+    const updated = await runTest(
+      Effect.gen(function* () {
+        const service = yield* BankAccountService
+        const created = yield* service.create(zarAccount)
+        return yield* service.update(created.id, { ...zarAccount, isDefault: false })
+      })
+    )
+
+    expect(updated.isDefault).toBe(true)
+  })
+
   test("should set a new default and unset old one", async () => {
     const result = await runTest(
       Effect.gen(function* () {

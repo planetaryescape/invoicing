@@ -38,7 +38,10 @@ export const BusinessInfoInput = Schema.Struct({
   bankName: Schema.String,
   accountNumber: Schema.String,
   branchCode: Schema.String,
-  defaultVatRate: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+  defaultVatRate: Schema.optionalKey(Schema.NullOr(Schema.Number.check(
+    Schema.isGreaterThanOrEqualTo(0),
+    Schema.isLessThanOrEqualTo(100),
+  ))),
 })
 export type BusinessInfoInput = typeof BusinessInfoInput.Type
 
@@ -80,7 +83,7 @@ export type Product = typeof Product.Type
 export const ProductInput = Schema.Struct({
   name: Schema.String,
   description: Schema.NullOr(Schema.String),
-  defaultPrice: Schema.Number,
+  defaultPrice: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
 })
 export type ProductInput = typeof ProductInput.Type
 
@@ -157,7 +160,7 @@ export const LineItemInput = Schema.Struct({
   productId: Schema.NullOr(Schema.Number),
   description: Schema.optionalKey(Schema.String),
   quantity: Schema.Number.check(Schema.isGreaterThan(0)),
-  unitPrice: Schema.optionalKey(Schema.Number),
+  unitPrice: Schema.optionalKey(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
   additionalNotes: Schema.optionalKey(Schema.NullOr(Schema.String)),
 })
 export type LineItemInput = typeof LineItemInput.Type
@@ -166,7 +169,10 @@ export const InvoiceInput = Schema.Struct({
   customerId: Schema.Number,
   bankAccountId: Schema.optionalKey(Schema.NullOr(Schema.Number)),
   dueDate: Schema.String,
-  vatRate: Schema.NullOr(Schema.Number),
+  vatRate: Schema.NullOr(Schema.Number.check(
+    Schema.isGreaterThanOrEqualTo(0),
+    Schema.isLessThanOrEqualTo(100),
+  )),
   notes: Schema.NullOr(Schema.String),
   lineItems: Schema.Array(LineItemInput),
 })
