@@ -164,8 +164,52 @@ test("gets and updates products and bank accounts", () =>
       expect(result.readBankAccount.label).toBe("Primary")
       expect(result.updatedBankAccount.label).toBe("Operations")
       expect(result.updatedBankAccount.accountNumber).toBeNull()
+      expect(result.updatedBankAccount.isDefault).toBe(true)
     }),
   ))
+
+test("rejects unsafe logo paths and non-positive invoice quantities", () =>
+  withRpc(async (rpcUrl) => {
+    const request = (id: string, tag: string, payload: unknown) => fetch(rpcUrl, {
+      method: "POST",
+      headers: { "content-type": "application/ndjson" },
+      body: `${JSON.stringify({ _tag: "Request", id, tag, payload, headers: [] })}\n`,
+    })
+    const businessInfo = {
+      companyName: "Invoicing Ltd",
+      streetAddress: "2 Main Road",
+      city: "Cape Town",
+      postalCode: "8001",
+      country: "South Africa",
+      vatNumber: "",
+      email: "billing@example.com",
+      phone: "",
+      logoPath: "../../etc/passwd",
+      accountHolderName: "Invoicing Ltd",
+      bankName: "Example Bank",
+      accountNumber: "1234",
+      branchCode: "0001",
+      defaultVatRate: null,
+    }
+    const invoice = {
+      customerId: 1,
+      dueDate: "2026-08-01",
+      vatRate: null,
+      notes: null,
+      lineItems: [{ productId: null, description: "Refund", quantity: -1, unitPrice: 50 }],
+    }
+
+    const [logoResponse, invoiceResponse] = await Promise.all([
+      request("unsafe-logo", "saveBusinessInfo", businessInfo),
+      request("negative-quantity", "createInvoice", invoice),
+    ])
+    const [logoBody, invoiceBody] = await Promise.all([logoResponse.text(), invoiceResponse.text()])
+
+    expect(logoBody).toContain("Die")
+    expect(logoBody).toContain("../../etc/passwd")
+    expect(invoiceBody).toContain("Die")
+    expect(invoiceBody).toContain("-1")
+  }))
 
 test("saves business info with nullable values", () =>
   withRpc((rpcUrl) =>

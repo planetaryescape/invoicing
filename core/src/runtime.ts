@@ -1,4 +1,5 @@
 import { Layer, ManagedRuntime } from "effect"
+import { BunFileSystem, BunPath } from "@effect/platform-bun"
 import { DatabaseLive } from "./services/Database.ts"
 import { CustomerServiceLive } from "./services/CustomerService.ts"
 import { ProductServiceLive } from "./services/ProductService.ts"
@@ -18,7 +19,8 @@ export const AppLayer = InvoicePDFServiceLive.pipe(
     )
   ),
   Layer.provideMerge(PDFServiceLive),
-  Layer.provideMerge(DatabaseLive)
+  Layer.provideMerge(DatabaseLive),
+  Layer.provideMerge(Layer.mergeAll(BunFileSystem.layer, BunPath.layer)),
 )
 
 export const AppRuntime = ManagedRuntime.make(AppLayer)
